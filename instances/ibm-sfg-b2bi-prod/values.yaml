@@ -8,7 +8,7 @@ global:
   ## Set the value to True in order to accept the application license 
   ## B2BI @ https://ibm.biz/BdPzHS
   ## SFG  @ https://ibm.biz/BdPzHv
-  license: false
+  license: true
   # Specify the license edition as per license agreement. Valid value is prod or non-prod for Production and 
   # Non-production respectively. Remember that this parameter is crucial for IBM Licensing and Metering Service
   licenseType: "prod"
@@ -19,10 +19,10 @@ global:
   # If digest is specified, it takes precedence over tag
     digest: sha256:4199ccb92349366fa5debbc7d4bccff9e56edaf0b22fa473e2040baedaa0acc8
     pullPolicy: IfNotPresent
-    pullSecret: ""
+    pullSecret: ibm-entitlement-key
   networkPolicies:
     ingress:
-      enabled: true
+      enabled: false
       customPolicies:
       #- name:
       #  fromSelectors:
@@ -45,7 +45,7 @@ global:
       #     endPort: 8450  
       
     egress:
-      enabled: true
+      enabled: false
       customPolicies:
       #- name:
       #  toSelectors:
@@ -81,7 +81,7 @@ serviceAccount:
   name: default
 
 resourcesInit:
-  enabled: false
+  enabled: true
   image:
     repository: "cp.icr.io/cp/ibm-b2bi"
     name: "b2bi-resources"
@@ -92,10 +92,10 @@ resourcesInit:
 
 persistence:
   enabled: true
-  useDynamicProvisioning: false
+  useDynamicProvisioning: true
 
 appResourcesPVC:
-  enabled: true
+  enabled: false
   storageClassName: ""
   selector:
     label: "intent"
@@ -160,7 +160,7 @@ dataSetup:
      # If digest is specified, it takes precedence over tag
     digest: sha256:ff279b7df12a22a1773753c8d03a1e32fb5ab8395b94c203dc3fa599e4184551
     pullPolicy: IfNotPresent
-    pullSecret: ""
+    pullSecret: ibm-entitlement-key
 
 
 env:
@@ -199,31 +199,31 @@ setupCfg:
   #upgrade: false
   basePort: 50000
   #License - specify values as true/false
-  licenseAcceptEnableSfg: false
+  licenseAcceptEnableSfg: true
   licenseAcceptEnableEbics: false
   licenseAcceptEnableFinancialServices: false
   licenseAcceptEnableFileOperation: false
 
   # Name of system passphrase secret if available
-  systemPassphraseSecret: 
+  systemPassphraseSecret: b2b-system-passphrase-secret
   #FIPS compliance mode. specify values as true/false 
   enableFipsMode: false
   # NIST 800-131a compliance mode. Please enter one of these values - strict/transition/"off"
   nistComplianceMode: "off"
 
   # Provide the DB attributes
-  dbVendor:
-  dbHost:
-  dbPort:
-  dbData:
-  dbDrivers:
+  dbVendor: db2
+  dbHost: 172.21.13.231
+  dbPort: 50000
+  dbData: B2BIDB
+  dbDrivers: db2jcc4.jar
   dbCreateSchema: true
   oracleUseServiceName: false
   # Values can be either true or false 
   usessl: false
   
   # Name of DB secret
-  dbSecret:
+  dbSecret: b2b-db-secret
   
   # Specify DB truststore file name including it's path relative to the mounted resources volume location, if applicable. Required when usessl is true.
   # When dbTruststoreSecret is mentioned, provide the name of the key holding the certificate data.
@@ -240,9 +240,9 @@ setupCfg:
   dbKeystoreSecret:
     
   #Provide the admin email address
-  adminEmailAddress:
+  adminEmailAddress: ibm@ibm.com
   # Provide the SMTP host details  
-  smtpHost:
+  smtpHost: us.ibm.com
 
   #Provide the termination grace period in seconds for containers. Only numeric value is accepted.
   terminationGracePeriod: 30
@@ -251,20 +251,20 @@ setupCfg:
   #JMS properties are optional if jmsVendor is empty
   #To use IBMMQ for communication between ASI & AC, change property to jmsVendor: IBMMQ
   # and provide other connection details
-  jmsVendor:
+  jmsVendor: IBMMQ
   # Provide the name of connection factory class. 
-  jmsConnectionFactory:
+  jmsConnectionFactory: com.ibm.mq.jms.MQQueueConnectionFactory
   jmsConnectionFactoryInstantiator:
-  jmsQueueName:
-  jmsHost:
-  jmsPort:
-  jmsConnectionNameList:
+  jmsQueueName: DEV.QUEUE.1
+  jmsHost: 172.21.207.107
+  jmsPort: 1414
+  jmsConnectionNameList: 172.21.207.107(1414)
   # Applicable for IBMMQ
-  jmsChannel:
-  jmsEnableSsl:
+  jmsChannel: DEV.APP.SVRCONN
+  jmsEnableSsl: false
   
   # Name of JMS secret if available
-  jmsSecret:
+  jmsSecret: b2b-jms-secret
   
   # Specify JMS keystore file name including it's path relative to the mounted resources volume location, if applicable.
   # When jmsKeystoreSecret is mentioned, provide the name of the key holding the certificate data.
@@ -386,7 +386,8 @@ asi:
     annotations: {}  
   
   backendService:
-    type: LoadBalancer
+    #type: LoadBalancer
+    type: NodePort
     # Supported values are "ClientIP" & "None". Default is "None".
     sessionAffinity: None
     #override session affinity timeout configuration (applicable when sessionAffinity is configured other than "None")
@@ -398,12 +399,12 @@ asi:
 
     # Supported values are "Cluster" & "Local". Default is "Cluster".
     externalTrafficPolicy: Cluster
-    ports: []
-      #- name: adapter-1
-      #  port: 30201
-      #  targetPort: 30201
-      #  nodePort: 30201
-      #  protocol: TCP
+    ports:
+      - name: adapter-1
+        port: 30201
+        targetPort: 30201
+        nodePort: 30201
+        protocol: TCP
     portRanges: []
       #- name: adapters
       #  portRange: 30301-30400
@@ -430,10 +431,10 @@ asi:
       #- arg2
 
   startupProbe:
-    initialDelaySeconds: 120
-    timeoutSeconds: 30
-    periodSeconds: 60
-    failureThreshold: 3
+    initialDelaySeconds: 1200
+    timeoutSeconds: 300
+    periodSeconds: 600
+    failureThreshold: 5
       
   internalAccess:
     enableHttps: true
@@ -447,7 +448,7 @@ asi:
     
   ingress:
     internal:
-      host: ""
+      host: asi-b2bi-prod.itzroks-664003h6xc-tuqjhz-4b4a324f027aea19c5cbc0c3275c4656-0000.us-east.containers.appdomain.cloud
       tls:
         enabled: true
         secretName: ""
@@ -457,7 +458,7 @@ asi:
       #    servicePort: "my-http"
       #    enableHttps: false
     external:
-      host: ""
+      host: itzroks-664003h6xc-tuqjhz-4b4a324f027aea19c5cbc0c3275c4656-0000.us-east.containers.appdomain.cloud
       tls:
         enabled: true
         secretName: ""
@@ -675,8 +676,8 @@ ac:
     annotations: {}  
       
   backendService:
-    type: LoadBalancer
-    # Supported values are "ClientIP" & "None". Default is "None".
+    #type: LoadBalancer
+    type: NodePort    # Supported values are "ClientIP" & "None". Default is "None".
     sessionAffinity: None
     #override session affinity timeout configuration (applicable when sessionAffinity is configured other than "None")
     sessionAffinityConfig:
@@ -687,12 +688,12 @@ ac:
 
     # Supported values are "Cluster" & "Local". Default is "Cluster".
     externalTrafficPolicy: Cluster
-    ports: []
-      #- name: adapter-1
-      #  port: 30401
-      #  targetPort: 30401
-      #  nodePort: 30401
-      #  protocol: TCP
+    ports:
+      - name: adapter-1
+        port: 30401
+        targetPort: 30401
+        nodePort: 30401
+        protocol: TCP
     portRanges: []
       #- name: adapters
       #  portRange: 30501-30600
@@ -722,7 +723,7 @@ ac:
       
   ingress:
     internal:
-      host: ""
+      host: ac-b2bi-prod.itzroks-664003h6xc-tuqjhz-4b4a324f027aea19c5cbc0c3275c4656-0000.us-east.containers.appdomain.cloud
       tls:
         enabled: true
         secretName: ""
@@ -732,7 +733,7 @@ ac:
       #    servicePort: "my-http"
       #    enableHttps: false
     external:
-      host: ""
+      host: itzroks-664003h6xc-tuqjhz-4b4a324f027aea19c5cbc0c3275c4656-0000.us-east.containers.appdomain.cloud
       tls:
         enabled: true
         secretName: ""
@@ -968,7 +969,7 @@ api:
 
   ingress:
     internal:
-      host: ""
+      host: api-b2bi-prod.itzroks-664003h6xc-tuqjhz-4b4a324f027aea19c5cbc0c3275c4656-0000.us-east.containers.appdomain.cloud
       tls:
         enabled: true
         secretName: ""
@@ -1133,14 +1134,14 @@ test:
     pullPolicy: 'IfNotPresent'
 
 purge:
-  enabled: true
+  enabled: false
   image:
     repository: "cp.icr.io/cp/ibm-b2bi/b2bi-purge"
   # Provide the tag value in double quotes
     tag: "6.1.2.2"
     digest: sha256:82af150873315122c804ec06ea356f7db186732f73ec00338076746202d84d25
     pullPolicy: IfNotPresent
-    pullSecret: ""
+    pullSecret: ibm-entitlement-key
   # Provide a schedule for the purge job as a cron expression. For example "0 0 * * *" will run the purge job at 00:00 every day
   schedule:
   startingDeadlineSeconds: 60
